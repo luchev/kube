@@ -1,0 +1,39 @@
+# --- Nginx frontend ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: aintcode
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/luchev/aintcode-web:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          env:
+            # Nginx template uses envsubst to bake this into the config at startup
+            - name: BACKEND_HOST
+              value: server.aintcode.svc.cluster.local
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: aintcode
+spec:
+  type: ClusterIP
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: 80
