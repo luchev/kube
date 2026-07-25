@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Bring up a local kind cluster with aintcode deployed.
 # Prerequisites: run ./scripts/docker-build.sh in aintcode first.
-# Usage: ./scripts/up.sh [cluster-name]
+# Usage: ./scripts/kind-up.sh [cluster-name]
 # Default cluster name: aintcode
 
 CLUSTER="${1:-aintcode}"
@@ -22,7 +22,7 @@ kind load docker-image "ghcr.io/luchev/aintcode-server:latest" --name "$CLUSTER"
 kind load docker-image "ghcr.io/luchev/aintcode-web:latest" --name "$CLUSTER"
 
 echo "==> Step 3: Deploy manifests"
-kubectl apply -f "$(dirname "$0")/../k8s/aintcode/"
+kubectl apply -f "$(dirname "$0")/../k8s/"
 
 echo "==> Step 4: Wait for pods..."
 kubectl wait --for=condition=ready pod -l app=postgres -n aintcode --timeout=60s
