@@ -1,17 +1,21 @@
 # Ingress for k3s (bundled Traefik ingress controller).
-# For HTTP-only testing. Add TLS + cert-manager when you have a domain.
+# TLS via cert-manager ClusterIssuer (letsencrypt-*).
+# To switch issuer, update the cert-manager.io/cluster-issuer annotation.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: web
   namespace: aintcode
   annotations:
-    # Allow large POST bodies for code submission
-    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
 spec:
   ingressClassName: traefik
+  tls:
+    - hosts:
+        - aintcode.com
+      secretName: aintcode-tls
   rules:
-    # Change this to your domain when you set up DNS
     - host: aintcode.com
       http:
         paths:

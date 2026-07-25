@@ -12,3 +12,6 @@ spec:
         hostPort: 443
     service:
       type: ClusterIP
+    deployment:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: "true"
