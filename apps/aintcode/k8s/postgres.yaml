@@ -1,52 +1,51 @@
-# --- PostgreSQL (single instance) ---
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: postgres
-  namespace: aintcode
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: postgres
-  template:
-    metadata:
-      labels:
-        app: postgres
-    spec:
-      containers:
-        - name: postgres
-          image: postgres:17-alpine
-          ports:
-            - containerPort: 5432
-          env:
-            - name: POSTGRES_DB
-              value: aintcode
-            - name: POSTGRES_USER
-              value: aintcode
-            - name: POSTGRES_PASSWORD
-              value: aintcode
-          readinessProbe:
-            exec:
-              command: ["pg_isready", "-U", "aintcode", "-d", "aintcode"]
-            initialDelaySeconds: 5
-            periodSeconds: 5
-          volumeMounts:
-            - name: pgdata
-              mountPath: /var/lib/postgresql/data
-      volumes:
-        - name: pgdata
-          persistentVolumeClaim:
-            claimName: postgres-data
----
+# --- Database password ---
 apiVersion: v1
-kind: Service
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: aintcode
+type: kubernetes.io/basic-auth
+stringData:
+  username: aintcode
+  password: ***REMOVED***
+
+---
+# --- CloudNativePG HA PostgreSQL cluster ---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
 metadata:
   name: postgres
   namespace: aintcode
 spec:
-  selector:
-    app: postgres
-  ports:
-    - port: 5432
-      targetPort: 5432
+  # 2 instances — one on each node for HA
+  instances: 2
+
+  # Database bootstrap
+  bootstrap:
+    initdb:
+      database: aintcode
+      owner: aintcode
+      secret:
+        name: postgres-secret
+
+  # Storage: each instance gets its own PVC on its node
+  storage:
+    size: 2Gi
+    storageClass: local-path
+
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: required
+
+  # Failover / switchover settings
+  primaryUpdateStrategy: unsupervised
+
+  # Resource limits (4GB Hetzner box)
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
