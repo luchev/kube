@@ -1,16 +1,3 @@
-# --- Server environment (secrets) ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: server-env
-  namespace: aintcode
-type: Opaque
-stringData:
-  DATABASE_URL: postgres://aintcode:***REMOVED***@postgres-rw:5432/aintcode
-  SESSION_SECRET: ***REMOVED***
-  APP_BASE_URL: "https://aintcode.luchev.dev"
-  PORT: "8787"
----
 # --- Fastify backend ---
 apiVersion: apps/v1
 kind: Deployment

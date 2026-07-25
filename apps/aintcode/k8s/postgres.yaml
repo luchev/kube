@@ -1,15 +1,3 @@
-# --- Database password ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: postgres-secret
-  namespace: aintcode
-type: kubernetes.io/basic-auth
-stringData:
-  username: aintcode
-  password: ***REMOVED***
-
----
 # --- CloudNativePG HA PostgreSQL cluster ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
