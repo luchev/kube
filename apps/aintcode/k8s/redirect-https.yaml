@@ -1,0 +1,29 @@
+# HTTP→HTTPS redirect via Traefik CRDs.
+# Regular Ingress only handles websecure (TLS).
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-https
+  namespace: aintcode
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+---
+# Catch HTTP (web entrypoint) traffic and redirect to HTTPS.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: http-redirect
+  namespace: aintcode
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`aintcode.com`)
+      kind: Rule
+      middlewares:
+        - name: redirect-https
+      services:
+        - name: web
+          port: 80
