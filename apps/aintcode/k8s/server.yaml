@@ -1,3 +1,16 @@
+# --- Server environment (secrets) ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: server-env
+  namespace: aintcode
+type: Opaque
+stringData:
+  DATABASE_URL: postgres://aintcode:***REMOVED***@postgres-rw:5432/aintcode
+  SESSION_SECRET: ***REMOVED***
+  APP_BASE_URL: "https://aintcode.luchev.dev"
+  PORT: "8787"
+---
 # --- Fastify backend ---
 apiVersion: apps/v1
 kind: Deployment
@@ -17,22 +30,12 @@ spec:
       containers:
         - name: server
           image: ghcr.io/luchev/aintcode-server:latest
-          # IfNotPresent so locally-loaded images work in kind, and cached
-          # images work when the cluster has no registry auth configured.
-          # For production, either set up a registry pull secret or pin a tag.
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8787
-          env:
-            - name: DATABASE_URL
-              value: postgres://aintcode:aintcode@postgres:5432/aintcode
-            - name: SESSION_SECRET
-              value: "change-me-in-production"
-            - name: APP_BASE_URL
-              value: "http://localhost"  # change to your domain when you have one
-            - name: PORT
-              value: "8787"
-            # SMTP is optional for local testing — server starts without it
+          envFrom:
+            - secretRef:
+                name: server-env
 ---
 # Headless-ish ClusterIP so the web container can reach the API via DNS.
 apiVersion: v1
