@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Deploy aintcode to a remote K3s server.
-# Usage: ./scripts/deploy.sh <server-host>
-# Example: ./scripts/deploy.sh 192.168.1.100
+# Usage: ./scripts/deploy-remote.sh <server-host>
+# Example: ./scripts/deploy-remote.sh 192.168.1.100
 # Prerequisites:
 #   - Server has k3s installed
 #   - KUBECONFIG pointing at remote cluster
@@ -13,7 +13,7 @@ set -euo pipefail
 SERVER="${1:?Usage: $0 <server-host>}"
 
 SCRIPT_DIR="$(dirname "$0")"
-MANIFEST_DIR="$SCRIPT_DIR/../k8s/aintcode"
+MANIFEST_DIR="$SCRIPT_DIR/../k8s"
 
 echo "==> Step 1: Copy manifests to server"
 rsync -avz "$MANIFEST_DIR/" "$SERVER:~/aintcode-k8s/" 2>/dev/null || {
