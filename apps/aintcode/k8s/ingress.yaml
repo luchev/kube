@@ -12,7 +12,7 @@ spec:
   ingressClassName: traefik
   rules:
     # Change this to your domain when you set up DNS
-    - host: aintcode.local
+    - host: aintcode.com
       http:
         paths:
           - path: /api
