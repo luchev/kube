@@ -14,9 +14,11 @@ spec:
       labels:
         app: server
     spec:
+      imagePullSecrets:
+        - name: ghcr-auth
       containers:
         - name: server
-          image: ghcr.io/luchev/aintcode-server:latest
+          image: ghcr.io/luchev/aintcode/aintcode-server:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8787

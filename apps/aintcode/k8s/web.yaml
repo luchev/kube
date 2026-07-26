@@ -14,9 +14,11 @@ spec:
       labels:
         app: web
     spec:
+      imagePullSecrets:
+        - name: ghcr-auth
       containers:
         - name: web
-          image: ghcr.io/luchev/aintcode-web:latest
+          image: ghcr.io/luchev/aintcode/aintcode-web:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
