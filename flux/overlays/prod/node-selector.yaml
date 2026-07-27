@@ -45,3 +45,27 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: 4gb-hel1-1
         kubernetes.io/os: linux
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-reflector-controller
+  namespace: flux-system
+spec:
+  template:
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: 4gb-hel1-1
+        kubernetes.io/os: linux
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-automation-controller
+  namespace: flux-system
+spec:
+  template:
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: 4gb-hel1-1
+        kubernetes.io/os: linux

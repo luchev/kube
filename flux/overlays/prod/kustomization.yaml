@@ -4,5 +4,6 @@ resources:
   - ../../base
   - infra-kustomization.yaml
   - aintcode-kustomization.yaml
+  - image-automation.yaml
 patches:
   - path: node-selector.yaml
