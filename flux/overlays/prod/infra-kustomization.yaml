@@ -2,13 +2,11 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: aintcode
+  name: infra
   namespace: flux-system
 spec:
-  dependsOn:
-    - name: infra
   interval: 5m
-  path: ./apps/aintcode/k8s
+  path: ./infra
   prune: true
   retryInterval: 30s
   sourceRef:
