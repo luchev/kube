@@ -2587,6 +2587,8 @@ spec:
         app.kubernetes.io/part-of: flux
         app.kubernetes.io/version: v2.9.2
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: 4gb-hel1-1
       containers:
       - args:
         - --events-addr=http://notification-controller.$(RUNTIME_NAMESPACE).svc.cluster.local./
@@ -3517,6 +3519,8 @@ spec:
         app.kubernetes.io/part-of: flux
         app.kubernetes.io/version: v2.9.2
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: 4gb-hel1-1
       containers:
       - args:
         - --events-addr=http://notification-controller.$(RUNTIME_NAMESPACE).svc.cluster.local./
@@ -5113,6 +5117,8 @@ spec:
         app.kubernetes.io/part-of: flux
         app.kubernetes.io/version: v2.9.2
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: 4gb-hel1-1
       containers:
       - args:
         - --events-addr=http://notification-controller.$(RUNTIME_NAMESPACE).svc.cluster.local./
@@ -6019,6 +6025,8 @@ spec:
         app.kubernetes.io/part-of: flux
         app.kubernetes.io/version: v2.9.2
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: 4gb-hel1-1
       containers:
       - args:
         - --watch-all-namespaces=true
