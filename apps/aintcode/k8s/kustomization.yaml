@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - sealed-postgres-secret.yaml
+  - sealed-server-env.yaml
+  - sealed-ghcr-auth.yaml
+  - postgres.yaml
+  - server.yaml
+  - web.yaml
+  - ingress.yaml
+  - redirect-https.yaml
+  - traefik-hostnet.yaml
+  - cert-manager/install.yaml
+  - cert-manager/cluster-issuer.yaml
