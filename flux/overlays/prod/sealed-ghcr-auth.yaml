@@ -1,0 +1,14 @@
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: ghcr-auth
+  namespace: flux-system
+spec:
+  encryptedData:
+    .dockerconfigjson: AgB6+dvmzW4zFqw/huCFF3vAar/FM0jk6vc6NxmUeZwf9FxwW5zGfJe+HNVmlvVC+t4gbdpGHClwNOrRVNX5PbcZIjMgPMNTv5FcKdtHFY3I0pzpZDDQRPftsnoyZgn5tph+w/ZyLDsBiBMev0e2762Swk67FnouMvnPRhA8LVIzToJoA3Eu45ooGTA/bMrjNNHuRMIdqDBTQqUElthH9dQ2CsElFEbHGUX5PaKkzSyOAObzSoPqzzwjrZwk6XnWVLjpBgmmK7AS4EDn2JdvcedXs4iQd1vuIT/BiUrUGg6DlnWW+Rz1o5x1D3J/DrmIrmDkS02YDynB74Nmt2OwEbe7gXVzYaINlruicttsYgic9rwnKoXFVoIx5iKBHWDcF5/4sbsTbUirBhcXhyFc25o8XiPsA78aXTG93gEVRS0ywb7sqr64MAIx1iii+vlhY0cZX/ACaCCabYbXPjrfUWhzHefYIMRiUbORtmtCXZaoi06QXoFOcKiqlSUuwBZneyxf5jarM9Twio2Aa1pwYfY+SV2bogERy7VOu8D5gschcdX3o3Hq5lm0xeZanqcznPwlJ1HjTpQb28rTdss3uTu+xoZLekn8oMu/EVhnTQka/IWxAZpXD6DrN56KL2RwTO6GrbxDThTL99qugmPFy60d9rVknzo4Z0dJGWAB0T410SURMU20DQtyLBOhtVe6d+w25lvlC+juhhm+MREL8YqFHwGBytmydHHf9zZ2euhE58ucE1ysdX9lSnWuSYOj/hFitOKBLwds0f3/HNonr5mvJ464HGgr1kBO/nyb7w4BdzSYlDpMpqrnANX2Vix9TbBrAPKXngRCU5UtJX+0VQ71Vn3qCeRc0RMwbYJJOc9pvwHIj9xAJhsNAKgqi1U45lxxBZkY8UeiE/JFIK24dMHGOEwxvMrNsyxdhsk=
+  template:
+    metadata:
+      name: ghcr-auth
+      namespace: flux-system
+    type: kubernetes.io/dockerconfigjson
