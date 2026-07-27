@@ -1,0 +1,13 @@
+[Unit]
+Description=IPIP tunnel for worker node internet access
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/node-network-setup.sh --master 2a01:4f8:1c18:65cc::1
+ExecStop=ip link del tun0
+
+[Install]
+WantedBy=multi-user.target
