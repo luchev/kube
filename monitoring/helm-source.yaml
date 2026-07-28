@@ -1,0 +1,14 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: victoria-metrics-k8s-stack
+  namespace: monitoring
+spec:
+  interval: 30m
+  url: oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-k8s-stack
+  ref:
+    semver: ">=0.28.0 <1.0.0"
+  layerSelector:
+    mediaType: "application/vnd.cncf.helm.chart.content.v1.tar+gzip"
+    operation: copy

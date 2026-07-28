@@ -1,0 +1,27 @@
+# Ingress for Grafana on victoria-metrics-k8s-stack.
+# TLS via cert-manager ClusterIssuer (letsencrypt-prod).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: monitoring
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - grafana.aintcode.com
+      secretName: grafana-tls
+  rules:
+    - host: grafana.aintcode.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: victoria-metrics-k8s-stack-grafana
+                port:
+                  number: 80

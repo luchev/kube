@@ -5,4 +5,5 @@ resources:
   - infra-kustomization.yaml
   - aintcode-kustomization.yaml
   - image-automation.yaml
+  - monitoring-kustomization.yaml
   - sealed-ghcr-auth.yaml

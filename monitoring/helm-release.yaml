@@ -1,0 +1,80 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: victoria-metrics-k8s-stack
+  namespace: monitoring
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: victoria-metrics-k8s-stack
+  interval: 30m
+  values:
+    vmsingle:
+      enabled: true
+      spec:
+        retentionPeriod: "30d"
+        storage:
+          size: "20Gi"
+        resources:
+          limits:
+            cpu: 500m
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+
+    vmagent:
+      enabled: true
+      spec:
+        resources:
+          limits:
+            cpu: 300m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
+    grafana:
+      enabled: true
+      ingress:
+        enabled: false
+      persistence:
+        enabled: true
+        size: 5Gi
+      resources:
+        limits:
+          cpu: 300m
+          memory: 256Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
+
+    alertmanager:
+      enabled: true
+      spec:
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+
+    kube-state-metrics:
+      resources:
+        limits:
+          cpu: 100m
+          memory: 256Mi
+        requests:
+          cpu: 50m
+          memory: 128Mi
+
+    prometheus-node-exporter:
+      resources:
+        limits:
+          cpu: 100m
+          memory: 64Mi
+        requests:
+          cpu: 50m
+          memory: 32Mi
