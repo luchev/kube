@@ -6,7 +6,7 @@ metadata:
   namespace: flux-system
 spec:
   image: ghcr.io/luchev/aintcode/aintcode-server
-  interval: 5m
+  interval: 1m
   secretRef:
     name: ghcr-auth
 ---
@@ -17,7 +17,7 @@ metadata:
   namespace: flux-system
 spec:
   image: ghcr.io/luchev/aintcode/aintcode-web
-  interval: 5m
+  interval: 1m
   secretRef:
     name: ghcr-auth
 ---
@@ -51,7 +51,7 @@ metadata:
   name: flux-system
   namespace: flux-system
 spec:
-  interval: 5m
+  interval: 1m
   sourceRef:
     kind: GitRepository
     name: flux-system

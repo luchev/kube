@@ -1,2 +1,3 @@
 data/sealed-secrets-key.yaml
 flux/known_hosts
+.worktrees/

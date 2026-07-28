@@ -23,7 +23,7 @@ metadata:
   namespace: flux-system
 spec:
   force: false
-  interval: 5m0s
+  interval: 1m0s
   path: ./flux/overlays/dev
   prune: true
   retryInterval: 30s
