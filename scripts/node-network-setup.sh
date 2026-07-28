@@ -10,6 +10,19 @@ usage() { echo "Usage: $0 --master <tunnel-peer-ipv6> | --worker <master-ipv4> <
 ROLE="${1:?$(usage)}"
 shift
 
+# Auto-detect the external interface (the one with the default route)
+EXT_IFACE=$(ip -4 route show default | head -1 | sed 's/.* dev \([^ ]*\).*/\1/')
+if [ -z "$EXT_IFACE" ]; then
+  # Fallback: try common names
+  for iface in eth0 enp7s0 ens3; do
+    if ip link show "$iface" &>/dev/null 2>&1; then
+      EXT_IFACE="$iface"
+      break
+    fi
+  done
+fi
+[ -n "$EXT_IFACE" ] || { echo "FATAL: cannot detect external interface"; exit 1; }
+
 case "$ROLE" in
   --master)
     PEER_V6="${1:?$(usage)}"
@@ -21,13 +34,13 @@ case "$ROLE" in
     fi
     # Enable IP forwarding
     sysctl -w net.ipv4.ip_forward=1
-    # NAT for tunnel subnet
-    iptables -t nat -C POSTROUTING -s 172.16.0.0/30 -o eth0 -j MASQUERADE 2>/dev/null || \
-      iptables -t nat -A POSTROUTING -s 172.16.0.0/30 -o eth0 -j MASQUERADE
-    iptables -C FORWARD -i tun0 -o eth0 -j ACCEPT 2>/dev/null || \
-      iptables -A FORWARD -i tun0 -o eth0 -j ACCEPT
-    iptables -C FORWARD -i eth0 -o tun0 -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
-      iptables -A FORWARD -i eth0 -o tun0 -m state --state ESTABLISHED,RELATED -j ACCEPT
+    # NAT for tunnel subnet (via the external interface)
+    iptables -t nat -C POSTROUTING -s 172.16.0.0/30 -o "$EXT_IFACE" -j MASQUERADE 2>/dev/null || \
+      iptables -t nat -A POSTROUTING -s 172.16.0.0/30 -o "$EXT_IFACE" -j MASQUERADE
+    iptables -C FORWARD -i tun0 -o "$EXT_IFACE" -j ACCEPT 2>/dev/null || \
+      iptables -A FORWARD -i tun0 -o "$EXT_IFACE" -j ACCEPT
+    iptables -C FORWARD -i "$EXT_IFACE" -o tun0 -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
+      iptables -A FORWARD -i "$EXT_IFACE" -o tun0 -m state --state ESTABLISHED,RELATED -j ACCEPT
     echo "Master tunnel configured. Peer: $PEER_V6"
     ;;
   --worker)
