@@ -15,7 +15,9 @@ spec:
       spec:
         retentionPeriod: "30d"
         storage:
-          size: "20Gi"
+          resources:
+            requests:
+              storage: "10Gi"
         resources:
           limits:
             cpu: 500m
