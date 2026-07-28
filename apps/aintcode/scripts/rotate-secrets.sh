@@ -58,8 +58,7 @@ echo -e "  ${YELLOW}POSTGRES_PASS${NC}  ${POSTGRES_PASS}"
 echo -e "  ${YELLOW}SESSION_SECRET${NC} ${SESSION_SECRET}"
 echo -e "  ${YELLOW}DATABASE_URL${NC}   ${DATABASE_URL}"
 
-# --- 1. ALTER USER in Postgres --------------------------------
-step "Step 1/5: Update password in Postgres …"
+step "Update password in Postgres …"
 PRIMARY_POD=$(kubectl get pod -n "${NAMESPACE}" \
   -l "cnpg.io/cluster=${CLUSTER},cnpg.io/instanceRole=primary" \
   -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
@@ -71,17 +70,26 @@ if [ -z "$PRIMARY_POD" ]; then
     -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
 fi
 
-if [ -z "$PRIMARY_POD" ]; then
-  warn "Could not find primary pod — run ALTER USER manually:"
-  echo "  kubectl exec -n ${NAMESPACE} <primary-pod> -- psql -c \"ALTER USER ${POSTGRES_USER} PASSWORD '${POSTGRES_PASS}';\""
-else
-  kubectl exec -n "${NAMESPACE}" "${PRIMARY_POD}" -- \
-    psql -c "ALTER USER ${POSTGRES_USER} PASSWORD '${POSTGRES_PASS}';"
-  ok "Password updated in Postgres (pod ${PRIMARY_POD})"
+ALTER_USER_DONE=false
+if [ -n "$PRIMARY_POD" ]; then
+  if kubectl exec -n "${NAMESPACE}" "${PRIMARY_POD}" -- \
+    psql -c "ALTER USER ${POSTGRES_USER} PASSWORD '${POSTGRES_PASS}';" 2>/dev/null; then
+    ALTER_USER_DONE=true
+    ok "Password updated in Postgres (pod ${PRIMARY_POD})"
+  fi
 fi
 
-# --- 2. seal into YAML ----------------------------------------
-step "Step 2/5: Build and seal Secret YAMLs …"
+if [ "$ALTER_USER_DONE" = false ]; then
+  PGPASS_CMD="kubectl exec -n ${NAMESPACE} <primary-pod> -- psql -c \"ALTER USER ${POSTGRES_USER} PASSWORD '${POSTGRES_PASS}';\""
+  warn "Could not run ALTER USER (primary pod unavailable)."
+  echo ""
+  echo "  The sealed secrets will still be applied, but Postgres still has the old password."
+  echo "  Run this once the primary is back:"
+  echo "    ${PGPASS_CMD}"
+  echo ""
+fi
+
+step "Build and seal Secret YAMLs …"
 
 SERVER_SECRET=$(cat <<-YAML
 apiVersion: v1
@@ -126,14 +134,20 @@ if [ "$DRY_RUN" = true ]; then
   exit 0
 fi
 
-# --- 3. apply to cluster --------------------------------------
-step "Step 3/5: Apply SealedSecrets to cluster …"
+step "Delete existing Secrets so SealedSecrets controller recreates them …"
+for s in server-env postgres-secret; do
+  if kubectl get secret -n "${NAMESPACE}" "$s" &>/dev/null; then
+    kubectl delete secret -n "${NAMESPACE}" "$s"
+    ok "deleted secret $s"
+  fi
+done
+
+step "Apply SealedSecrets to cluster …"
 kubectl apply -f "${STATIC_DIR}/sealed-server-env.yaml" \
              -f "${STATIC_DIR}/sealed-postgres-secret.yaml"
 ok "SealedSecrets applied"
 
-# --- 4. restart server ----------------------------------------
-step "Step 4/5: Restart server deployment …"
+step "Restart server deployment …"
 kubectl rollout restart -n "${NAMESPACE}" deploy/server
 # wait for rollout to complete
 if kubectl rollout status -n "${NAMESPACE}" deploy/server --timeout=120s; then
@@ -143,8 +157,7 @@ else
   echo "  kubectl rollout status -n ${NAMESPACE} deploy/server"
 fi
 
-# --- 5. commit sealed YAMLs -----------------------------------
-step "Step 5/5: Commit new sealed YAMLs …"
+step "Commit new sealed YAMLs …"
 if [ "$NO_COMMIT" = true ]; then
   echo "  ${YELLOW}Skip commit (--no-commit). To commit:${NC}"
   echo "  cd ${SCRIPT_DIR}/../.. && git add -A && git commit -m \"Rotate secrets\""
