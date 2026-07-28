@@ -14,18 +14,56 @@ TUNNEL_SCRIPT="$(dirname "$0")/scripts/node-network-setup.sh"
 echo "==> Fetching token from master (via IPv4 $MASTER_IPV4)"
 TOKEN=$(ssh "root@$MASTER_IPV4" cat /var/lib/rancher/k3s/server/node-token)
 
-echo "==> Setting up IPIP tunnel on $NEW"
-# Copy and run the network setup script on the new node
+echo "==> Detecting worker IPv6"
+WORKER_IPV6=$(ssh "root@$NEW" "ip -6 addr show scope global | grep -oP '(?<=inet6 )[\da-f:]+' | head -1" || true)
+if [ -z "$WORKER_IPV6" ]; then
+  echo "ERROR: no global IPv6 found on worker. Tunnel requires IPv6 connectivity between nodes."
+  exit 1
+fi
+
+echo "==> Setting up IPIP tunnel on master → $WORKER_IPV6"
+ssh "root@$MASTER_IPV4" "
+# Install script if not already there
+if [ ! -f /usr/local/bin/node-network-setup.sh ]; then
+cat > /usr/local/bin/node-network-setup.sh << 'SCRIPT'
+$(cat "$TUNNEL_SCRIPT")
+SCRIPT
+chmod +x /usr/local/bin/node-network-setup.sh
+fi
+
+# Create or update systemd service for this worker's tunnel
+# Note: for multiple workers, each gets tun0..tunN — currently single-worker
+cat > /etc/systemd/system/ipip-tunnel.service << 'SERVICE'
+[Unit]
+Description=IPIP tunnel for worker $WORKER_IPV6
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/node-network-setup.sh --master $WORKER_IPV6
+ExecStop=ip link del tun0
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+systemctl daemon-reload
+systemctl enable ipip-tunnel
+/usr/local/bin/node-network-setup.sh --master $WORKER_IPV6
+"
+
+echo "==> Setting up IPIP tunnel on worker $NEW → $MASTER_IPV6"
 ssh "root@$NEW" "
 cat > /usr/local/bin/node-network-setup.sh << 'SCRIPT'
 $(cat "$TUNNEL_SCRIPT")
 SCRIPT
 chmod +x /usr/local/bin/node-network-setup.sh
 
-# Create systemd service for persistence
 cat > /etc/systemd/system/ipip-tunnel.service << 'SERVICE'
 [Unit]
-Description=IPIP tunnel for worker node internet access
+Description=IPIP tunnel to master $MASTER_IPV6
 After=network-online.target
 Wants=network-online.target
 

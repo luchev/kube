@@ -10,7 +10,7 @@ set -euo pipefail
 #   ./bootstrap-flux.sh --dev   --ssh-key ~/.ssh/flux-deploy-key
 #
 # Flags:
-#   --prod        Production overlay (nodeSelector pins to master node)
+#   --prod        Production overlay (no nodeSelector — controllers schedule freely)
 #   --dev         Dev overlay (no nodeSelector — works on any single node)
 #   --ssh-key     Path to the SSH private key for GitHub auth (required)
 #   --kubeconfig  Path to kubeconfig (optional, defaults to KUBECONFIG env or ~/.kube/config)
