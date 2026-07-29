@@ -1,3 +1,5 @@
 data/sealed-secrets-key.yaml
 flux/known_hosts
 .worktrees/
+kubectl-config-hetzner
+tests/kubeconfig.yaml
