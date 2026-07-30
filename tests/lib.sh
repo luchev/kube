@@ -19,10 +19,63 @@ REPO_ROOT="$(cd "$TEST_DIR/.." && pwd)"
 CLUSTER_NAME="${CLUSTER_NAME:-aintcode-e2e}"
 TEST_TAG="${TEST_TAG:-e2e-test}"
 TEST_TAG_2="${TEST_TAG_2:-e2e-test-updated}"
-AINTCODE_DIR="${AINTCODE_DIR:-$HOME/aintcode}"
 REGISTRY="${REGISTRY:-ghcr.io/luchev/aintcode}"
 KUBECONFIG="${KUBECONFIG:-}"
 KIND_KUBECONFIG=""
+
+# kube-test repo for Flux GitOps test
+KUBE_TEST_REPO="${KUBE_TEST_REPO:-git@github.com:luchev/kube-test.git}"
+KUBE_TEST_DIR="${KUBE_TEST_DIR:-$TEST_DIR/kube-test-work}"
+KUBE_TEST_BRANCH="${KUBE_TEST_BRANCH:-main}"
+KUBE_TEST_MANIFEST_PATH="${KUBE_TEST_MANIFEST_PATH:-apps/aintcode}"
+
+# GitHub token for Flux HTTPS auth + git push
+GITHUB_TOKEN="${GITHUB_TOKEN:-${GHCR_TOKEN:-}}"
+
+
+# ── GHCR helpers ───────────────────────────────────────────
+
+ghcr_login() {
+  if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+    fail "GITHUB_TOKEN or GHCR_TOKEN must be set for GHCR operations"
+    return 1
+  fi
+  info "Logging into GHCR..."
+  echo "$GITHUB_TOKEN" | docker login ghcr.io -u luchev --password-stdin >/dev/null 2>&1
+  pass "GHCR login OK"
+}
+
+ghcr_pull_and_tag() {
+  local src_tag="${1:-latest}"
+  local dst_tag="${2:-$TEST_TAG}"
+  info "Pulling images from GHCR (tag: $src_tag)..."
+  docker pull "$REGISTRY/aintcode-server:$src_tag" >/dev/null
+  docker pull "$REGISTRY/aintcode-web:$src_tag" >/dev/null
+  docker tag "$REGISTRY/aintcode-server:$src_tag" "$REGISTRY/aintcode-server:$dst_tag"
+  docker tag "$REGISTRY/aintcode-web:$src_tag" "$REGISTRY/aintcode-web:$dst_tag"
+  pass "Images pulled and re-tagged as $dst_tag"
+}
+
+ghcr_push_tag() {
+  local tag="${1:-$TEST_TAG}"
+  info "Pushing test tag '$tag' to GHCR..."
+  docker push "$REGISTRY/aintcode-server:$tag" >/dev/null
+  docker push "$REGISTRY/aintcode-web:$tag" >/dev/null
+  pass "Test tag '$tag' pushed to GHCR"
+}
+
+cleanup_ghcr_tag() {
+  local tag="${1:-$TEST_TAG}"
+  if command -v oras &>/dev/null && [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    info "Removing GHCR tag '$tag'..."
+    ORAS_PASSWORD="$GITHUB_TOKEN" oras tag rm "$REGISTRY/aintcode-server:$tag" 2>/dev/null || true
+    ORAS_PASSWORD="$GITHUB_TOKEN" oras tag rm "$REGISTRY/aintcode-web:$tag" 2>/dev/null || true
+    pass "GHCR tags removed"
+  else
+    info "Skipping GHCR cleanup (oras not available or GITHUB_TOKEN not set)"
+  fi
+}
+
 
 # ── Kind helpers ────────────────────────────────────────────
 
@@ -57,35 +110,11 @@ kind_destroy() {
   fi
 }
 
-kind_load_images() {
-  local tag="${1:-$TEST_TAG}"
-  info "Loading images with tag '$tag' into kind..."
-  kind load docker-image "$REGISTRY/aintcode-server:$tag" --name "$CLUSTER_NAME"
-  kind load docker-image "$REGISTRY/aintcode-web:$tag" --name "$CLUSTER_NAME"
-  pass "Images loaded into kind"
-}
-
-# ── Image build helpers ─────────────────────────────────────
-
-build_images() {
-  local tag="${1:-$TEST_TAG}"
-  info "Building Docker images with tag '$tag'..."
-  if [[ ! -d "$AINTCODE_DIR" ]]; then
-    fail "aintcode directory not found at $AINTCODE_DIR"
-    return 1
-  fi
-  docker build -q -f "$AINTCODE_DIR/Dockerfile.server" \
-    -t "$REGISTRY/aintcode-server:$tag" "$AINTCODE_DIR" >/dev/null
-  docker build -q -f "$AINTCODE_DIR/Dockerfile.web" \
-    -t "$REGISTRY/aintcode-web:$tag" "$AINTCODE_DIR" >/dev/null
-  pass "Images built: $REGISTRY/aintcode-*:$tag"
-}
 
 # ── Flux helpers ────────────────────────────────────────────
 
 flux_install() {
   info "Installing Flux controllers..."
-  # Use the bundled gotk-components.yaml from the repo
   kubectl apply -f "$REPO_ROOT/flux/base/gotk-components.yaml"
   pass "Flux CRDs + controllers applied"
 
@@ -98,6 +127,71 @@ flux_install() {
   pass "Flux controllers ready"
 }
 
+create_flux_sources() {
+  local test_tag="${1:-$TEST_TAG}"
+  local namespace="${2:-flux-system}"
+
+  if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+    fail "GITHUB_TOKEN is required for Flux GitRepository auth"
+    return 1
+  fi
+
+  info "Creating GitHub token secret for Flux..."
+  kubectl delete secret gh-token -n "$namespace" 2>/dev/null || true
+  kubectl create secret generic gh-token -n "$namespace" \
+    --from-literal=username=luchev \
+    --from-literal=password="$GITHUB_TOKEN"
+  pass "GitHub token secret created"
+
+  info "Creating GitRepository for kube-test..."
+  cat <<EOF | kubectl apply -f -
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: kube-test
+  namespace: $namespace
+spec:
+  interval: 30s
+  ref:
+    branch: $KUBE_TEST_BRANCH
+  url: https://github.com/luchev/kube-test
+  secretRef:
+    name: gh-token
+EOF
+
+  info "Creating Kustomization for aintcode app..."
+  cat <<EOF | kubectl apply -f -
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: aintcode
+  namespace: $namespace
+spec:
+  interval: 30s
+  path: ./$KUBE_TEST_MANIFEST_PATH
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: kube-test
+  patches:
+    - patch: |
+        - op: replace
+          path: /spec/replicas
+          value: 1
+      target:
+        kind: Deployment
+    - patch: |
+        - op: replace
+          path: /spec/instances
+          value: 1
+      target:
+        kind: Cluster
+        name: postgres
+EOF
+  pass "Flux GitRepository + Kustomization created"
+}
+
+
 # ── CNPG helpers ────────────────────────────────────────────
 
 cnpg_install() {
@@ -109,31 +203,57 @@ cnpg_install() {
   pass "CNPG operator installed via Helm"
 }
 
+
 # ── Storage helpers ─────────────────────────────────────────
 
 install_local_path_provisioner() {
   info "Installing local-path storage provisioner..."
   kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.28/deploy/local-path-storage.yaml
-  # Patch it to be the default StorageClass
   kubectl patch storageclass local-path -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}' 2>/dev/null || true
   pass "local-path StorageClass installed (default)"
 }
 
-# ── Deploy helpers ──────────────────────────────────────────
 
-deploy_app() {
-  local tag="${1:-$TEST_TAG}"
-  info "Deploying aintcode app with tag '$tag'..."
+# ── kube-test GitOps helpers ────────────────────────────────
 
-  # Update image tag via kustomize images transformer
-  sed -i "s/newTag: .*/newTag: $tag/" \
-    "$TEST_DIR/overlays/local/kustomization.yaml"
-
-  # Build with --load-restrictor to allow referencing prod manifests outside overlay dir
-  kustomize build --load-restrictor LoadRestrictionsNone \
-    "$TEST_DIR/overlays/local/" | kubectl apply -f -
-  pass "App manifests applied"
+kube_test_clone() {
+  if [[ -d "$KUBE_TEST_DIR" ]]; then
+    info "kube-test workdir exists, pulling latest..."
+    git -C "$KUBE_TEST_DIR" pull --ff-only origin "$KUBE_TEST_BRANCH" 2>/dev/null || true
+  else
+    info "Cloning kube-test repo..."
+    git clone --depth=1 --branch "$KUBE_TEST_BRANCH" "$KUBE_TEST_REPO" "$KUBE_TEST_DIR"
+  fi
+  pass "kube-test repo ready at $KUBE_TEST_DIR"
 }
+
+kube_test_update_tag() {
+  local new_tag="${1:-$TEST_TAG_2}"
+  local file="${2:-$KUBE_TEST_DIR/$KUBE_TEST_MANIFEST_PATH/server.yaml}"
+
+  info "Updating image tag in kube-test manifests to '$new_tag'..."
+  # Update server image tag
+  sed -i '' "s|image: $REGISTRY/aintcode-server:.*|image: $REGISTRY/aintcode-server:$new_tag|" "$file"
+  # Update web image tag
+  sed -i '' "s|image: $REGISTRY/aintcode-web:.*|image: $REGISTRY/aintcode-web:$new_tag|" \
+    "$KUBE_TEST_DIR/$KUBE_TEST_MANIFEST_PATH/web.yaml"
+  pass "Image tag updated to $new_tag in kube-test manifests"
+}
+
+kube_test_commit_and_push() {
+  local tag="${1:-$TEST_TAG_2}"
+  info "Committing and pushing tag update to kube-test..."
+
+  git -C "$KUBE_TEST_DIR" add -A
+  git -C "$KUBE_TEST_DIR" commit -m "test: bump image tag to $tag [ci skip]"
+
+  # Use token for push auth
+  local remote_url
+  remote_url="https://luchev:${GITHUB_TOKEN}@github.com/luchev/kube-test.git"
+  git -C "$KUBE_TEST_DIR" push "$remote_url" "$KUBE_TEST_BRANCH" >/dev/null 2>&1
+  pass "Tag update pushed to kube-test"
+}
+
 
 # ── Wait helpers ────────────────────────────────────────────
 
@@ -170,7 +290,58 @@ wait_for_pods() {
   done
 
   warn "Timeout waiting for pods in namespace '$namespace'"
+  return 1
 }
+
+wait_for_flux_kustomization() {
+  local name="${1:-aintcode}"
+  local namespace="${2:-flux-system}"
+  local timeout="${3:-180}"
+  local end=$((SECONDS + timeout))
+
+  info "Waiting for Flux Kustomization '$name' to reconcile..."
+  while [[ $SECONDS -lt $end ]]; do
+    local ready
+    ready=$(kubectl get kustomization.kustomize.toolkit.fluxcd.io "$name" \
+      -n "$namespace" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
+    if [[ "$ready" == "True" ]]; then
+      pass "Flux Kustomization '$name' reconciled"
+      return 0
+    fi
+    sleep 5
+  done
+
+  warn "Timeout waiting for Flux Kustomization '$name'"
+  kubectl describe kustomization.kustomize.toolkit.fluxcd.io "$name" -n "$namespace" 2>/dev/null | tail -30
+  return 1
+}
+
+wait_for_flux_image_update() {
+  local expected_tag="${1:-$TEST_TAG_2}"
+  local namespace="${2:-aintcode}"
+  local timeout="${3:-180}"
+  local end=$((SECONDS + timeout))
+
+  info "Waiting for pods to roll out with tag '$expected_tag'..."
+  while [[ $SECONDS -lt $end ]]; do
+    local image
+    image=$(kubectl get deployment server -n "$namespace" \
+      -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "")
+    if echo "$image" | grep -q "$expected_tag"; then
+      pass "Server deployment updated to $image"
+      # Wait for actual rollout
+      kubectl rollout status deployment/server -n "$namespace" --timeout=60s >/dev/null 2>&1 || true
+      kubectl rollout status deployment/web -n "$namespace" --timeout=60s >/dev/null 2>&1 || true
+      return 0
+    fi
+    sleep 10
+  done
+
+  warn "Timeout waiting for image tag '$expected_tag'"
+  kubectl describe deployment server -n "$namespace" 2>/dev/null | grep -A5 "Image"
+  return 1
+}
+
 
 # ── Verification helpers ────────────────────────────────────
 
@@ -214,49 +385,26 @@ verify_flux_ready() {
   $all_ready
 }
 
-verify_image_update() {
-  local tag="${1:-$TEST_TAG_2}"
+verify_image_running() {
+  local expected_tag="${1:-$TEST_TAG}"
   local namespace="${2:-aintcode}"
 
-  info "Testing image update to tag '$tag'..."
-
-  # Build new images
-  build_images "$tag"
-  kind_load_images "$tag"
-
-  # Update the deployment image directly
-  kubectl set image deployment/server -n "$namespace" \
-    "server=$REGISTRY/aintcode-server:$tag"
-  kubectl set image deployment/web -n "$namespace" \
-    "web=$REGISTRY/aintcode-web:$tag"
-
-  pass "Deployment images updated to $tag"
-
-  # Wait for rollout
-  info "Waiting for rollout..."
-  kubectl rollout status deployment/server -n "$namespace" --timeout=120s >/dev/null 2>&1 || warn "server rollout not complete"
-  kubectl rollout status deployment/web -n "$namespace" --timeout=120s >/dev/null 2>&1 || warn "web rollout not complete"
-  pass "Rollout complete"
-
-  # Verify the new image is running
-  local server_image
-  server_image=$(kubectl get deployment server -n "$namespace" -o jsonpath='{.spec.template.spec.containers[0].image}')
-  if echo "$server_image" | grep -q "$tag"; then
-    pass "Server running image: $server_image"
-  else
-    fail "Server image mismatch: $server_image (expected $tag)"
-    return 1
-  fi
-
-  local web_image
-  web_image=$(kubectl get deployment web -n "$namespace" -o jsonpath='{.spec.template.spec.containers[0].image}')
-  if echo "$web_image" | grep -q "$tag"; then
-    pass "Web running image: $web_image"
-  else
-    fail "Web image mismatch: $web_image (expected $tag)"
-    return 1
-  fi
+  info "Verifying running images have tag '$expected_tag':"
+  local ok=true
+  for dep in server web; do
+    local image
+    image=$(kubectl get deployment "$dep" -n "$namespace" \
+      -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)
+    if echo "$image" | grep -q "$expected_tag"; then
+      pass "  $dep — $image"
+    else
+      fail "  $dep — $image (expected tag $expected_tag)"
+      ok=false
+    fi
+  done
+  $ok
 }
+
 
 # ── Port-forward helpers ────────────────────────────────────
 
@@ -284,20 +432,6 @@ verify_http_response() {
   fi
 }
 
-# ── Image tag cleanup on GHCR ───────────────────────────────
-
-cleanup_ghcr_tag() {
-  local tag="${1:-$TEST_TAG}"
-  # Only run if oras is available and GHCR_TOKEN is set
-  if command -v oras &>/dev/null && [[ -n "${GHCR_TOKEN:-}" ]]; then
-    info "Removing GHCR tag '$tag'..."
-    oras tag rm "ghcr.io/luchev/aintcode/aintcode-server:$tag" 2>/dev/null || true
-    oras tag rm "ghcr.io/luchev/aintcode/aintcode-web:$tag" 2>/dev/null || true
-    pass "GHCR tags removed"
-  else
-    info "Skipping GHCR cleanup (oras not available or GHCR_TOKEN not set)"
-  fi
-}
 
 # ── Summary ─────────────────────────────────────────────────
 
