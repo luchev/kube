@@ -44,14 +44,30 @@ CLUSTER="postgres"        # CNPG Cluster resource name
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATIC_DIR="$(cd "${SCRIPT_DIR}/../k8s" && pwd)"
 
+# --- url encoding -------------------------------------------
+# percent-encode for safe embedding in a URL (RFC 3986 unreserved chars pass through)
+urlencode() {
+  local s="$1" c encoded=""
+  local -i i
+  for ((i = 0; i < ${#s}; i++)); do
+    c="${s:i:1}"
+    case "$c" in
+      [a-zA-Z0-9._~-]) encoded+="$c" ;;
+      *) printf -v c '%%%02X' "'$c"; encoded+="$c" ;;
+    esac
+  done
+  printf '%s' "$encoded"
+}
+
 # --- generate new secrets ------------------------------------
 POSTGRES_USER="${POSTGRES_USER:-aintcode}"
-POSTGRES_PASS="${POSTGRES_PASS:-$(openssl rand -base64 32)}"
+# hex alphabet (0-9a-f) is URL-safe — base64 could contain / + = and break DATABASE_URL
+POSTGRES_PASS="${POSTGRES_PASS:-$(openssl rand -hex 32)}"
 SESSION_SECRET="${SESSION_SECRET:-$(openssl rand -base64 32)}"
 APP_BASE_URL="${APP_BASE_URL:-https://aintcode.com}"
 PORT="${PORT:-8787}"
 
-DATABASE_URL="postgres://${POSTGRES_USER}:${POSTGRES_PASS}@postgres-rw:5432/aintcode"
+DATABASE_URL="postgres://${POSTGRES_USER}:$(urlencode "${POSTGRES_PASS}")@postgres-rw:5432/aintcode"
 
 info "Generated values:"
 echo -e "  ${YELLOW}POSTGRES_PASS${NC}  ${POSTGRES_PASS}"
