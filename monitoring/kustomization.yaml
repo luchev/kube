@@ -7,3 +7,4 @@ resources:
   - grafana-ingress.yaml
   - traefik-vmservicescrape.yaml
   - flux-vmservicescrape.yaml
+  - flux-dashboard.yaml
