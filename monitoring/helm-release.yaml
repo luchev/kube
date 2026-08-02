@@ -323,7 +323,7 @@ spec:
                       ready: [ status, conditions, "[type=Ready]", status ]
                       suspended: [ spec, suspend ]
                       source_name: [ spec, imageRepositoryRef, name ]
-                      latestImage: [ status, latestImage ]
+                      latestImage: [ status, latestRef, tag ]
               - groupVersionKind:
                   group: image.toolkit.fluxcd.io
                   version: v1
