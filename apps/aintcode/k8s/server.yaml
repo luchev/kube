@@ -18,7 +18,7 @@ spec:
         - name: ghcr-auth
       containers:
         - name: server
-          image: ghcr.io/luchev/aintcode/aintcode-server:0.1.0-build.11 # {"$imagepolicy": "flux-system:aintcode-server"}
+          image: ghcr.io/luchev/aintcode/aintcode-server:0.1.0-build.12 # {"$imagepolicy": "flux-system:aintcode-server"}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8787
