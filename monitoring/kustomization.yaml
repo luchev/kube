@@ -6,5 +6,5 @@ resources:
   - helm-release.yaml
   - grafana-ingress.yaml
   - traefik-vmservicescrape.yaml
-  - flux-vmservicescrape.yaml
+  - flux-vmpodscrape.yaml
   - flux-dashboard.yaml
