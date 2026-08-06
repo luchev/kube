@@ -221,8 +221,13 @@ kube_test_clone() {
     info "kube-test workdir exists, pulling latest..."
     git -C "$KUBE_TEST_DIR" pull --ff-only origin "$KUBE_TEST_BRANCH" 2>/dev/null || true
   else
+    local clone_url="$KUBE_TEST_REPO"
+    # Use HTTPS with token in CI (no SSH keys available)
+    if [[ -n "${GITHUB_TOKEN:-}" && "$clone_url" == git@* ]]; then
+      clone_url="https://luchev:${GITHUB_TOKEN}@github.com/luchev/kube-test.git"
+    fi
     info "Cloning kube-test repo..."
-    git clone --depth=1 --branch "$KUBE_TEST_BRANCH" "$KUBE_TEST_REPO" "$KUBE_TEST_DIR"
+    git clone --depth=1 --branch "$KUBE_TEST_BRANCH" "$clone_url" "$KUBE_TEST_DIR"
   fi
   pass "kube-test repo ready at $KUBE_TEST_DIR"
 }
@@ -232,11 +237,10 @@ kube_test_update_tag() {
   local file="${2:-$KUBE_TEST_DIR/$KUBE_TEST_MANIFEST_PATH/server.yaml}"
 
   info "Updating image tag in kube-test manifests to '$new_tag'..."
-  # Update server image tag
-  sed -i '' "s|image: $REGISTRY/aintcode-server:.*|image: $REGISTRY/aintcode-server:$new_tag|" "$file"
-  # Update web image tag
-  sed -i '' "s|image: $REGISTRY/aintcode-web:.*|image: $REGISTRY/aintcode-web:$new_tag|" \
-    "$KUBE_TEST_DIR/$KUBE_TEST_MANIFEST_PATH/web.yaml"
+  sed_i() { local f="$1"; shift; if [[ "$(uname)" == "Darwin" ]]; then sed -i '' "$@" "$f"; else sed -i "$@" "$f"; fi; }
+  sed_i "$file" "s|image: $REGISTRY/aintcode-server:.*|image: $REGISTRY/aintcode-server:$new_tag|"
+  sed_i "$KUBE_TEST_DIR/$KUBE_TEST_MANIFEST_PATH/web.yaml" \
+    "s|image: $REGISTRY/aintcode-web:.*|image: $REGISTRY/aintcode-web:$new_tag|"
   pass "Image tag updated to $new_tag in kube-test manifests"
 }
 
