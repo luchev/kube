@@ -6,7 +6,7 @@ metadata:
   namespace: aintcode
 spec:
   # 2 instances — one on each node for HA
-  instances: 2
+  instances: 1
 
   # Database bootstrap
   bootstrap:
