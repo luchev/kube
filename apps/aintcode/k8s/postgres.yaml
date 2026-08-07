@@ -5,8 +5,8 @@ metadata:
   name: postgres
   namespace: aintcode
 spec:
-  # 2 instances — one on each node for HA
-  instances: 2
+  # 1 instance — temporary scale-down for clean re-join
+  instances: 1
 
   # Database bootstrap
   bootstrap:
