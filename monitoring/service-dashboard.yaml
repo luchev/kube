@@ -520,7 +520,7 @@ data:
               },
               "editorMode": "code",
               "exemplar": true,
-              "expr": "gotk_resource_info{customresource_kind=\"ImagePolicy\"}",
+              "expr": "gotk_resource_info{customresource_kind=\"ImagePolicy\"} * on (name, exported_namespace) group_left(repo) label_replace(gotk_resource_info{customresource_kind=\"ImageRepository\"}, \"repo\", \"$1\", \"image\", \"(.*)/[^/]+\")",
               "format": "table",
               "instant": true,
               "interval": "",
@@ -548,7 +548,8 @@ data:
                 "renameByName": {
                   "latestImage": "Latest image",
                   "name": "Policy",
-                  "source_name": "Repository"
+                  "repo": "Repository",
+                  "source_name": "source_name"
                 }
               }
             }
