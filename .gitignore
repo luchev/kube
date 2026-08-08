@@ -4,3 +4,4 @@ flux/known_hosts
 kubectl-config-hetzner
 tests/kubeconfig.yaml
 .cnpg-scale-back
+.omo/
