@@ -8,3 +8,4 @@ resources:
   - traefik-vmservicescrape.yaml
   - flux-vmpodscrape.yaml
   - flux-dashboard.yaml
+  - service-dashboard.yaml
