@@ -7,3 +7,5 @@ resources:
   - image-automation.yaml
   - monitoring-kustomization.yaml
   - sealed-ghcr-auth.yaml
+  - yolo-kustomization.yaml
+  - yolo-image-automation.yaml

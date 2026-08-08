@@ -1,0 +1,50 @@
+# --- Collect Polymarket markets to /data on a loop ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yolo
+  namespace: yolo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: yolo
+  template:
+    metadata:
+      labels:
+        app: yolo
+    spec:
+      imagePullSecrets:
+        - name: ghcr-auth
+      containers:
+        - name: yolo
+          image: ghcr.io/luchev/yolo-market/yolo:0.1.0-build.0 # {"$imagepolicy": "flux-system:yolo"}
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - -m
+            - yolo.data
+            - --collect
+            - --tag
+            - politics
+            - --volume-min
+            - "10000"
+            - --interval
+            - "900"
+          env:
+            - name: YOLO_DATA_DIR
+              value: "/data"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: yolo-data
