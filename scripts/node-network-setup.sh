@@ -5,7 +5,7 @@ set -euo pipefail
 # Run with: --master on the master node, --worker on the worker node.
 # The tunnel creates a routable IPv4 path for workers that have no default route.
 
-usage() { echo "Usage: $0 --master <tunnel-peer-ipv6> | --worker <master-ipv4> <tunnel-peer-ipv6>"; exit 1; }
+usage() { echo "Usage: $0 --master <worker-private-ipv4> | --worker <master-private-ipv4>"; exit 1; }
 
 ROLE="${1:?$(usage)}"
 shift
@@ -25,10 +25,14 @@ fi
 
 case "$ROLE" in
   --master)
-    PEER_V6="${1:?$(usage)}"
+    PEER_V4="${1:?$(usage)}"
+    # Recreate if the tunnel points at a stale peer
+    if ip link show tun0 &>/dev/null && ! ip tunnel show tun0 | grep -q "remote $PEER_V4"; then
+      ip link del tun0
+    fi
     # Create tunnel if not exists
     if ! ip link show tun0 &>/dev/null; then
-      ip tunnel add tun0 mode ipip local any remote "$PEER_V6"
+      ip tunnel add tun0 mode ipip local any remote "$PEER_V4"
       ip addr add 172.16.0.1/30 dev tun0
       ip link set tun0 up
     fi
@@ -41,14 +45,17 @@ case "$ROLE" in
       iptables -A FORWARD -i tun0 -o "$EXT_IFACE" -j ACCEPT
     iptables -C FORWARD -i "$EXT_IFACE" -o tun0 -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
       iptables -A FORWARD -i "$EXT_IFACE" -o tun0 -m state --state ESTABLISHED,RELATED -j ACCEPT
-    echo "Master tunnel configured. Peer: $PEER_V6"
+    echo "Master tunnel configured. Peer: $PEER_V4"
     ;;
   --worker)
-    MASTER_IP="${1:?$(usage)}"
-    PEER_V6="${2:?$(usage)}"
+    MASTER_V4="${1:?$(usage)}"
+    # Recreate if the tunnel points at a stale peer
+    if ip link show tun0 &>/dev/null && ! ip tunnel show tun0 | grep -q "remote $MASTER_V4"; then
+      ip link del tun0
+    fi
     # Create tunnel if not exists
     if ! ip link show tun0 &>/dev/null; then
-      ip tunnel add tun0 mode ipip local any remote "$PEER_V6"
+      ip tunnel add tun0 mode ipip local any remote "$MASTER_V4"
       ip addr add 172.16.0.2/30 dev tun0
       ip link set tun0 up
     fi
@@ -56,7 +63,7 @@ case "$ROLE" in
     if ! ip route show | grep -q 'default via 172.16.0.1'; then
       ip route add default via 172.16.0.1 metric 10
     fi
-    echo "Worker tunnel configured. Master: $MASTER_IP ($PEER_V6)"
+    echo "Worker tunnel configured. Master: $MASTER_V4"
     ;;
   *)
     usage

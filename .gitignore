@@ -3,3 +3,4 @@ flux/known_hosts
 .worktrees/
 kubectl-config-hetzner
 tests/kubeconfig.yaml
+.cnpg-scale-back
